@@ -31,6 +31,7 @@ class CSMN(object):
           [-1, size, self.mem_dim]
       )
     return output2dim
+
   def _init_img_mem(self, conv_cnn):
     """
     Returns:
@@ -50,6 +51,22 @@ class CSMN(object):
         reuse = False
     )
     return img_mem_A, img_mem_C
+  
+def _init_tpc_mem(self, topics):
+    """
+    Params:
+        topics: input2dim, i.e. num of topic
+    Returns:
+        tpc_mem: [tpc_num, mem_dim]
+    """
+    tps_mem = self._embedding_to_hidden(
+            topics,
+            1,
+            scope = 'Wtpc',
+            reuse = False
+            )
+    return tpc_mem
+
   def _text_cnn(self, inputs, filter_sizes, mem_size, scope):
     """Text CNN. Code from https://github.com/dennybritz/cnn-text-classification-tf
 
@@ -187,7 +204,11 @@ class CSMN(object):
     )
 
     # Build Memories
+    # Image Memory
     img_mem_A, img_mem_C = self._init_img_mem(conv_cnn)
+    # User Context Memory
+    # todo:
+    # modify to topic memory
     context_mem_A, context_mem_C = self._init_words_mem(
         context,
         tf.stack([self.batch_size, context_largest_length]),
@@ -197,6 +218,7 @@ class CSMN(object):
         is_init_B = False
     )
 
+    # Word Output Memory
     if self.is_training:
       output_mem_A, output_mem_B, output_mem_C = self._init_words_mem(
           caption,
@@ -242,6 +264,7 @@ class CSMN(object):
 
       def _test_input():
         def _go_symbol():
+            # GO_ID = 1
           return tf.constant(GO_ID, shape=[self.batch_size, 1], dtype=tf.int32)
 
         def _not_go_symbol():
@@ -317,8 +340,10 @@ class CSMN(object):
       )
 
       # Memory network computation (mem_A -> attention -> mem_Catt)
+      # todo
       mem_A = tf.concat([img_mem_A, context_mem_A, output_mem_state_A_], 1)
-      innerp_mem_A = tf.matmul(query, mem_A, adjoint_b=True)
+      # innerp_mem_A = tf.matmul(query, mem_A, adjoint_b=True)
+       innerp_mem_A = tf.matmul(query, mem_A, adjoint_b=True)
 
       memory_sizes = [
           self.img_memory_size,
