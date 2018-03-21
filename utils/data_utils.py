@@ -41,20 +41,18 @@ flags.DEFINE_integer('mem_dim', 1024,
 flags.DEFINE_integer('num_channels', 300,
     """Number of channels of memory cnn."""
 )
-
-
-
-
-
-
+flags.DEFINE_string('input_path', 'test1.txt',
+        """path to the input text""")
 
 FLAGS = flags.FLAGS
 
-
 root_path = "/"
 train_fpath = 'train.txt'
-val_fpath = 'test1.txt'
+# val_fpath = 'test1.txt'
+val_fpath = FLAGS.input_path
 
+print('img_data_dir : %s'%FLAGS.img_data_dir)
+print('val_fpath : %s'%val_fpath)
 
 def _generate_data_and_label_batch(inputs, min_queue_examples,
                                     batch_size, shuffle):

@@ -27,7 +27,7 @@ flags.DEFINE_string(
 flags.DEFINE_integer("num_gpus", 4, "Number of gpus to use")
 flags.DEFINE_integer('eval_interval_secs', 60 * 1,
                             """How often to run the eval.""")
-flags.DEFINE_boolean('run_once', False,
+flags.DEFINE_boolean('run_once', True,
                          """Whether to run eval only once.""")
 TOWER_NAME = 'tower'
 
@@ -80,6 +80,8 @@ def _eval_once(saver, summary_writer, argmaxs, answer_ids, vocab, rev_vocab,
       num_iter = 1 + int(
           num_examples_per_epoch / FLAGS.batch_size / FLAGS.num_gpus
       )
+      # print('num_examples_per_epoch : ', num_examples_per_epoch)
+      # print('num_iter : ', num_iter)
 
 
       desc_list = []

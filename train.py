@@ -82,6 +82,7 @@ def train():
     )
 
     gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.95)
+    gpu_options.allow_growth = True
     with tf.Session(
         config=tf.ConfigProto(
             allow_soft_placement=True,
@@ -158,7 +159,7 @@ def train():
           clipped_grads_and_vars, global_step=global_step
       )
       # Create a saver.
-      saver = tf.train.Saver(tf.global_variables(), max_to_keep=200)
+      saver = tf.train.Saver(tf.global_variables(), max_to_keep=5)
 
       # Build the summary operation from the last tower summaries.
       summary_op = tf.summary.merge(summaries)

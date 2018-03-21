@@ -108,7 +108,8 @@ def main(_):
     # Create the model
     with slim.arg_scope(resnet_v1.resnet_arg_scope()):
       net, end_points = resnet_v1.resnet_v1_101(
-          processed_images, num_classes=1000, is_training=False
+          # processed_images, num_classes=1000, is_training=False
+          processed_images, num_classes=1000
       )
       init_fn = slim.assign_from_checkpoint_fn(
           FLAGS.checkpoint_dir, slim.get_model_variables()

@@ -1,0 +1,8 @@
+*.pyc
+*.tar.gz
+*.ckpt
+
+model/resnet101_v2
+backup
+checkpoints
+data

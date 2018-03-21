@@ -24,6 +24,14 @@ If you use this code or dataset as part of any published research, please refer 
 }
 ```
 
+## UPDATE BY JAY
+add an API to run your own image to hashtag and captions
+
+```
+# modify image path in img2txt.sh
+./img2txt
+```
+
 ## Running Code
 
 ### Get our code
