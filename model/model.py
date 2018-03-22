@@ -230,10 +230,12 @@ class CSMN(object):
     )
     '''
     # tpc_mem_a, tpc_mem_c, u_matrix = self._init_tpc_mem(topics)
+    print('caption: ', caption.eval())
+    print('topics: ',  topics.eval())
     tpc_mem_A, tpc_mem_C = self._init_words_mem(
         topics,
         tf.stack([self.batch_size, 1]),
-        np.ones([FLAGS.batch_size, 1], dtype=np.bool),
+        tf.ones([self.batch_size, 1], dtype=tf.bool),
         1,
         is_first_time = True,
         is_init_B = False

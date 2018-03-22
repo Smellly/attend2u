@@ -1,6 +1,7 @@
 *.pyc
 *.tar.gz
 *.ckpt
+*.swp
 
 model/resnet101_v2
 backup

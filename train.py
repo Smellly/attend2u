@@ -77,8 +77,7 @@ def get_topics(path):
         pass
     else:
         # return a random initlized matrix
-        return tf.get_variable('topics', [20, 1], 
-                dtype=dtype.int32, initializer=tf.random_normal_initializer, trainable=True)
+        return [np.random.randint(4000) for x in range(20)]
 
 def train():
     colorlog.basicConfig(
