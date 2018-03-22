@@ -52,20 +52,31 @@ class CSMN(object):
     )
     return img_mem_A, img_mem_C
   
-def _init_tpc_mem(self, topics):
+  def _init_tpc_mem(self, topics):
     """
     Params:
         topics: input2dim, i.e. num of topic
     Returns:
         tpc_mem: [tpc_num, mem_dim]
     """
-    tps_mem = self._embedding_to_hidden(
+    tps_mem_a = self._embedding_to_hidden(
             topics,
             1,
-            scope = 'Wtpc',
+            scope = 'Wtpc_a',
             reuse = False
             )
-    return tpc_mem
+
+    tps_mem_c = self._embedding_to_hidden(
+            topics,
+            1,
+            scope = 'Wtpc_c',
+            reuse = False
+            )
+
+    u_matrix =  tf.get_variable('u_matrix', [self.mem_dim, self.mem_dim], dtype=dtype.float32,
+            initializer=tf.random_uniform_initializer, trainable=True)
+
+    return tpc_mem_a, tpc_mem_c, u_matrix
 
   def _text_cnn(self, inputs, filter_sizes, mem_size, scope):
     """Text CNN. Code from https://github.com/dennybritz/cnn-text-classification-tf
@@ -103,7 +114,6 @@ def _init_tpc_mem(self, topics):
         )
         pooled_outputs.append(pooled)
     return pooled_outputs
-
 
   def _init_words_mem(self, words, shape, words_mask, max_length, is_first_time, is_init_B):
     """
@@ -156,7 +166,7 @@ def _init_tpc_mem(self, topics):
 
   def __init__(self, inputs, config, name="CSMN", is_training=True):
     (conv_cnn, context_largest_length, output_largest_length,
-        context, caption, answer, context_mask, output_mask) = inputs
+        context, caption, answer, context_mask, output_mask, topics) = inputs
     context_largest_length = tf.reduce_max(context_largest_length)
     output_largest_length = tf.reduce_max(output_largest_length)
     # Set config's variables as models' variables
@@ -209,11 +219,22 @@ def _init_tpc_mem(self, topics):
     # User Context Memory
     # todo:
     # modify to topic memory
+    '''
     context_mem_A, context_mem_C = self._init_words_mem(
         context,
         tf.stack([self.batch_size, context_largest_length]),
         context_mask,
         self.max_context_length,
+        is_first_time = True,
+        is_init_B = False
+    )
+    '''
+    # tpc_mem_a, tpc_mem_c, u_matrix = self._init_tpc_mem(topics)
+    tpc_mem_A, tpc_mem_C = self._init_words_mem(
+        topics,
+        tf.stack([self.batch_size, 1]),
+        np.ones([FLAGS.batch_size, 1], dtype=np.bool),
+        1,
         is_first_time = True,
         is_init_B = False
     )
@@ -341,21 +362,24 @@ def _init_tpc_mem(self, topics):
 
       # Memory network computation (mem_A -> attention -> mem_Catt)
       # todo
-      mem_A = tf.concat([img_mem_A, context_mem_A, output_mem_state_A_], 1)
+      # mem_A = tf.concat([img_mem_A, context_mem_A, output_mem_state_A_], 1)
       # innerp_mem_A = tf.matmul(query, mem_A, adjoint_b=True)
-       innerp_mem_A = tf.matmul(query, mem_A, adjoint_b=True)
+      mem_A = tf.concat([img_mem_A, output_mem_state_A_], 1)
+      innerp_mem_A = tf.matmul(query, mem_A, adjoint_b=True)
 
       memory_sizes = [
           self.img_memory_size,
-          self.max_context_length,
           self.max_output_length
       ]
+          # self.max_context_length,
+
       attention = tf.nn.softmax(
           tf.reshape(innerp_mem_A, [-1, self.memory_size]),
           name='attention'
       )
 
-      img_attention, context_attention, output_attention = \
+      # img_attention, context_attention, output_attention = \
+      img_attention,  output_attention = \
           tf.split(attention, memory_sizes, axis=1)
 
       img_attention = tf.tile(
@@ -365,13 +389,13 @@ def _init_tpc_mem(self, topics):
           ),
           [1, 1, self.mem_dim]
       )
-      context_attention = tf.tile(
-          tf.reshape(
-              context_attention,
-              [self.batch_size, self.max_context_length, 1]
-          ),
-          [1, 1, self.mem_dim]
-      )
+      # context_attention = tf.tile(
+      #     tf.reshape(
+      #         context_attention,
+      #         [self.batch_size, self.max_context_length, 1]
+      #     ),
+      #     [1, 1, self.mem_dim]
+      # )
       output_attention = tf.tile(
           tf.reshape(
               output_attention,
@@ -384,10 +408,10 @@ def _init_tpc_mem(self, topics):
           img_mem_C * img_attention,
           [self.batch_size, self.mem_dim]
       )
-      context_weighted_mem_C = tf.expand_dims(
-          context_mem_C * context_attention,
-          -1
-      )
+      # context_weighted_mem_C = tf.expand_dims(
+      #     context_mem_C * context_attention,
+      #     -1
+      # )
       output_weighted_mem_C = tf.expand_dims(
           output_mem_state_C_ * output_attention,
           -1
@@ -395,12 +419,12 @@ def _init_tpc_mem(self, topics):
 
       # Memory CNN
       pooled_outputs = []
-      pooled_outputs += self._text_cnn(
-          context_weighted_mem_C,
-          self.context_filter_sizes,
-          self.max_context_length,
-          scope = "context"
-      )
+      # pooled_outputs += self._text_cnn(
+      #     context_weighted_mem_C,
+      #     self.context_filter_sizes,
+      #     self.max_context_length,
+      #     scope = "context"
+      # )
       pooled_outputs += self._text_cnn(
           output_weighted_mem_C,
           self.output_filter_sizes,

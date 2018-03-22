@@ -72,6 +72,13 @@ def _average_gradients(tower_grads):
     average_grads.append(grad_and_var)
   return average_grads
 
+def get_topics(path):
+    if path:
+        pass
+    else:
+        # return a random initlized matrix
+        return tf.get_variable('topics', [20, 1], 
+                dtype=dtype.int32, initializer=tf.random_normal_initializer, trainable=True)
 
 def train():
     colorlog.basicConfig(
@@ -97,6 +104,7 @@ def train():
           tower_caption_length, tower_context_id, tower_caption_id, \
           tower_answer_id, tower_context_mask, \
           tower_caption_mask = enqueue(False)
+      tower_topics = get_topics(False)
 
       # Calculate the learning rate schedule.
       num_batches_per_epoch = (num_examples_per_epoch /
@@ -130,7 +138,8 @@ def train():
                   tower_caption_id[i],
                   tower_answer_id[i],
                   tower_context_mask[i],
-                  tower_caption_mask[i]
+                  tower_caption_mask[i],
+                  tower_topics
               ]
               loss = _tower_loss(inputs, scope)
 
