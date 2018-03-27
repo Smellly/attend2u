@@ -20,7 +20,7 @@ flags.DEFINE_string("img_data_dir",
     "data directory [data]"
 )
 
-flags.DEFINE_integer("max_context_length", 60,
+flags.DEFINE_integer("max_context_length", 5,
     "User contex max length default [60]"
 )
 flags.DEFINE_integer("max_output_length", 16,
@@ -41,13 +41,13 @@ flags.DEFINE_integer('mem_dim', 1024,
 flags.DEFINE_integer('num_channels', 300,
     """Number of channels of memory cnn."""
 )
-flags.DEFINE_string('input_path', 'test1.txt',
+flags.DEFINE_string('input_path', 'tpc_test1.txt',
         """path to the input text""")
 
 FLAGS = flags.FLAGS
 
 root_path = "/"
-train_fpath = 'train.txt'
+train_fpath = 'tpc_train.txt'
 # val_fpath = 'test1.txt'
 val_fpath = FLAGS.input_path
 
@@ -137,7 +137,7 @@ def read_numpy_format_and_label(filename_queue):
       tf.cast(
           tf.string_to_number(batch_context_length),
           tf.int32
-      ),
+      )+1,
       FLAGS.max_context_length
   )
   batch_caption_length = tf.minimum(
@@ -154,7 +154,7 @@ def read_numpy_format_and_label(filename_queue):
   )
   batch_context_id = tf.py_func(
       token_split_func,
-      [batch_context, FLAGS.max_context_length],
+      [batch_context, FLAGS.max_context_length, 'caption'],
       tf.int32
   )
   batch_caption_id = tf.py_func(
@@ -196,7 +196,6 @@ def mergers(chunk_l):
       newdata.append(data)
   return newdata
 def enqueue(eval_data):
-
   # string input format
   # numpyfname,contextlength,captionlength,contexttoken1_contexttoken2,wordtoken1_wordtoken2
   # e.g. 12345.npy,4,3,445_24_445_232,134_466_234

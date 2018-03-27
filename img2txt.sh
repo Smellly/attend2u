@@ -7,9 +7,9 @@ image_path='data/Lake_mapourika_NZ.jpg'
 
 rm data/caption_dataset/test3.txt
 
-CUDA_VISIBLE_DEVICES=0 python xImg.py $image_path
+CUDA_VISIBLE_DEVICES=1 python xImg.py $image_path
 
-CUDA_VISIBLE_DEVICES=0 python -m eval \
+CUDA_VISIBLE_DEVICES=1 python -m eval \
             --num_gpus 1 \
             --batch_size 1 \
             --input_path test3.txt \

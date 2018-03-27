@@ -6,6 +6,8 @@ from __future__ import print_function
 import tensorflow as tf
 import colorlog
 import time
+import numpy as np
+
 from utils.data_utils import enqueue
 from utils.configuration import ModelConfig
 from model.model import CSMN
@@ -27,13 +29,20 @@ flags.DEFINE_string(
 flags.DEFINE_integer("num_gpus", 4, "Number of gpus to use")
 flags.DEFINE_integer('eval_interval_secs', 60 * 1,
                             """How often to run the eval.""")
-flags.DEFINE_boolean('run_once', False,
+flags.DEFINE_boolean('run_once', True,
                          """Whether to run eval only once.""")
 TOWER_NAME = 'tower'
 
 
 
 FLAGS = flags.FLAGS
+
+def get_topics(path):
+    if path:
+        pass
+    else:
+        # return a random initlized matrix
+        return [np.random.randint(4000) for x in range(20)]
 
 def _load_vocabulary(vocab_fname):
   with open(vocab_fname, 'r') as f:
@@ -70,6 +79,8 @@ def _eval_once(saver, summary_writer, argmaxs, answer_ids, vocab, rev_vocab,
       print('No checkpoint file found')
       return
 
+    print('caption: ', caption.eval())
+    print('topics: ',  topics.eval())
     # Start the queue runners.
     coord = tf.train.Coordinator()
     try:
@@ -80,6 +91,8 @@ def _eval_once(saver, summary_writer, argmaxs, answer_ids, vocab, rev_vocab,
       num_iter = 1 + int(
           num_examples_per_epoch / FLAGS.batch_size / FLAGS.num_gpus
       )
+      # print('num_examples_per_epoch : ', num_examples_per_epoch)
+      # print('num_iter : ', num_iter)
 
 
       desc_list = []
@@ -165,7 +178,7 @@ def evaluate():
                 tower_context_mask[i],
                 tower_caption_mask[i]
             ]
-            net = CSMN(inputs, ModelConfig(FLAGS), is_training= False)
+            net = CSMN(inputs, ModelConfig(FLAGS), is_training= False, topics)
             argmax = net.argmax
             # Reuse variables for the next tower.
             tf.get_variable_scope().reuse_variables()
@@ -202,4 +215,3 @@ def main(argv=None):
 
 if __name__ == '__main__':
   tf.app.run()
-
