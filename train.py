@@ -16,7 +16,7 @@ flags.DEFINE_integer("num_gpus", 4, "Number of gpus to use")
 flags.DEFINE_string('train_dir', './checkpoints',
                            """Directory where to write event logs """
                            """and checkpoint.""")
-flags.DEFINE_float("init_lr", 0.001, "initial learning rate [0.01]")
+flags.DEFINE_float("init_lr", 0.0001, "initial learning rate [0.01]")
 flags.DEFINE_float("max_grad_norm", 100, "clip gradients to this norm [100]")
 flags.DEFINE_integer("max_steps", 500000, "number of steps to use during training [500000]")
 
@@ -28,7 +28,7 @@ LEARNING_RATE_DECAY_FACTOR = 0.8  # Learning rate decay factor.
 TOWER_NAME = 'tower'
 
 def _tower_loss(inputs, scope):
-  net = CSMN(inputs, ModelConfig(FLAGS))
+  net = CSMN(inputs, ModelConfig(FLAGS, True))
   loss = net.loss
   tf.summary.scalar(scope+'loss', loss)
   return loss
@@ -72,14 +72,8 @@ def _average_gradients(tower_grads):
     average_grads.append(grad_and_var)
   return average_grads
 
-def get_topics(path):
-    if path:
-        pass
-    else:
-        # return a random initlized matrix
-        return [np.random.randint(4000) for x in range(20)]
-
 def train():
+    print('training...')
     colorlog.basicConfig(
         filename=None,
         level=logging.INFO,
@@ -103,7 +97,6 @@ def train():
           tower_caption_length, tower_context_id, tower_caption_id, \
           tower_answer_id, tower_context_mask, \
           tower_caption_mask = enqueue(False)
-      tower_topics = get_topics(False)
 
       # Calculate the learning rate schedule.
       num_batches_per_epoch = (num_examples_per_epoch /
@@ -138,21 +131,27 @@ def train():
                   tower_answer_id[i],
                   tower_context_mask[i],
                   tower_caption_mask[i],
-                  tower_topics
               ]
+              # print('loss before')
               loss = _tower_loss(inputs, scope)
 
               # Reuse variables for the next tower.
               tf.get_variable_scope().reuse_variables()
+              # print('reuse after')
 
               # Retain the summaries from the final tower.
               summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
+              # print('summaries after')
 
               # Calculate the gradients for the batch of data on this CIFAR tower.
+              # Returns:
+              #   A list of (gradient, variable) pairs. Variable is always present, but gradient can be None.
               grads = opt.compute_gradients(loss)
+              # print('grads after')
 
               # Keep track of the gradients across all towers.
               tower_grads.append(grads)
+              # print('tower_grads')
 
       # We must calculate the mean of each gradient. Note that this is the
       # synchronization point across all towers.
@@ -175,11 +174,13 @@ def train():
       # Build an initialization operation to run below.
       init = tf.global_variables_initializer()
 
+      print('initing...')
       sess.run(init)
 
       ckpt = tf.train.get_checkpoint_state(FLAGS.train_dir)
       if ckpt and ckpt.model_checkpoint_path:
         # Restores from checkpoint
+        print('Restoring from checkpoint...')
         saver.restore(sess, ckpt.model_checkpoint_path)
       # Start the queue runners.
       tf.train.start_queue_runners(sess=sess)
@@ -188,6 +189,7 @@ def train():
       for step in xrange(FLAGS.max_steps):
         start_time = time.time()
         _, loss_value = sess.run([apply_gradient_op, loss])
+        # print('step and loss : ', step, loss_value)
         duration = time.time() - start_time
         assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
 
