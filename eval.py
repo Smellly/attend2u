@@ -27,7 +27,7 @@ flags.DEFINE_string(
 flags.DEFINE_integer("num_gpus", 1, "Number of gpus to use")
 flags.DEFINE_integer('eval_interval_secs', 60 * 1,
                             """How often to run the eval.""")
-flags.DEFINE_boolean('run_once', True,
+flags.DEFINE_boolean('run_once', False,
                          """Whether to run eval only once.""")
 TOWER_NAME = 'tower'
 

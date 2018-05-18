@@ -38,8 +38,13 @@ class ModelConfig(BaseConfig):
 
     # Memory size
     self.img_memory_size = 1
+<<<<<<< HEAD
     # self.max_context_length = 
     # self.max_output_length = 16
+=======
+    #self.max_context_length = 80
+    #self.max_output_length = 16
+>>>>>>> a70be27688c00fb3ff4a82edd7bc32790747c69e
     if topic_flag:
         # print('!!!!!!!!!!!!!!!!!!!!!!!topic!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         self.memory_size = (

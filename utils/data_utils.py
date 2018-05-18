@@ -20,7 +20,7 @@ flags.DEFINE_string("img_data_dir",
     "data directory [data]"
 )
 
-flags.DEFINE_integer("max_context_length", 60,
+flags.DEFINE_integer("max_context_length", 5,
     "User contex max length default [60]"
 )
 flags.DEFINE_integer("max_output_length", 16,
@@ -44,13 +44,21 @@ flags.DEFINE_integer('mem_dim', 1024,
 flags.DEFINE_integer('num_channels', 300,
     """Number of channels of memory cnn."""
 )
+<<<<<<< HEAD
 flags.DEFINE_string('input_path', 'tpcon_test1.txt',
+=======
+flags.DEFINE_string('input_path', 'tpc_test1.txt',
+>>>>>>> a70be27688c00fb3ff4a82edd7bc32790747c69e
         """path to the input text""")
 
 FLAGS = flags.FLAGS
 
 root_path = "/"
+<<<<<<< HEAD
 train_fpath = 'tpcon_train.txt'
+=======
+train_fpath = 'tpc_train.txt'
+>>>>>>> a70be27688c00fb3ff4a82edd7bc32790747c69e
 # val_fpath = 'test1.txt'
 val_fpath = FLAGS.input_path
 

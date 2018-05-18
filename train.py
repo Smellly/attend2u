@@ -16,7 +16,11 @@ flags.DEFINE_integer("num_gpus", 4, "Number of gpus to use")
 flags.DEFINE_string('train_dir', './checkpoints-tpnocon',
                            """Directory where to write event logs """
                            """and checkpoint.""")
+<<<<<<< HEAD
 flags.DEFINE_float("init_lr", 0.000001, "initial learning rate [0.01]")
+=======
+flags.DEFINE_float("init_lr", 0.0001, "initial learning rate [0.01]")
+>>>>>>> a70be27688c00fb3ff4a82edd7bc32790747c69e
 flags.DEFINE_float("max_grad_norm", 100, "clip gradients to this norm [100]")
 flags.DEFINE_integer("max_steps", 2000000, "number of steps to use during training [500000]")
 
