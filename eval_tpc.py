@@ -6,25 +6,27 @@ from __future__ import print_function
 import tensorflow as tf
 import colorlog
 import time
+import numpy as np
+
 from utils.data_utils import enqueue
 from utils.configuration import ModelConfig
-from model.model_tpcnocon import CSMN
+from model.model import CSMN
 from scripts.generate_dataset import EOS_ID
 from utils.evaluator import Evaluator
 from termcolor import colored
 flags = tf.app.flags
 
-flags.DEFINE_string('eval_dir', './checkpoints-tpnocon/eval',
+flags.DEFINE_string('eval_dir', './checkpoints/eval',
                            """Directory where to write event logs.""")
 flags.DEFINE_string('eval_data', 'test',
                            """Either 'test' or 'train_eval'.""")
-flags.DEFINE_string("train_dir", "./checkpoints-tpnocon", "checkpoint directory [checkpoints]")
+flags.DEFINE_string("train_dir", "./checkpoints", "checkpoint directory [checkpoints]")
 flags.DEFINE_string(
     "vocab_fname",
     "./data/caption_dataset/40000.vocab",
     "Vocabulary file for evaluation"
 )
-flags.DEFINE_integer("num_gpus", 1, "Number of gpus to use")
+flags.DEFINE_integer("num_gpus", 4, "Number of gpus to use")
 flags.DEFINE_integer('eval_interval_secs', 60 * 1,
                             """How often to run the eval.""")
 flags.DEFINE_boolean('run_once', True,
@@ -34,6 +36,13 @@ TOWER_NAME = 'tower'
 
 
 FLAGS = flags.FLAGS
+
+def get_topics(path):
+    if path:
+        pass
+    else:
+        # return a random initlized matrix
+        return [np.random.randint(4000) for x in range(20)]
 
 def _load_vocabulary(vocab_fname):
   with open(vocab_fname, 'r') as f:
@@ -60,7 +69,6 @@ def _eval_once(saver, summary_writer, argmaxs, answer_ids, vocab, rev_vocab,
     ckpt = tf.train.get_checkpoint_state(FLAGS.train_dir)
     if ckpt and ckpt.model_checkpoint_path:
       # Restores from checkpoint
-      print('model path:', ckpt.model_checkpoint_path)
       saver.restore(sess, ckpt.model_checkpoint_path)
 
       # extract global_step from it.
@@ -71,6 +79,8 @@ def _eval_once(saver, summary_writer, argmaxs, answer_ids, vocab, rev_vocab,
       print('No checkpoint file found')
       return
 
+    print('caption: ', caption.eval())
+    print('topics: ',  topics.eval())
     # Start the queue runners.
     coord = tf.train.Coordinator()
     try:
@@ -81,6 +91,8 @@ def _eval_once(saver, summary_writer, argmaxs, answer_ids, vocab, rev_vocab,
       num_iter = 1 + int(
           num_examples_per_epoch / FLAGS.batch_size / FLAGS.num_gpus
       )
+      # print('num_examples_per_epoch : ', num_examples_per_epoch)
+      # print('num_iter : ', num_iter)
 
 
       desc_list = []
@@ -146,8 +158,8 @@ def evaluate():
   with tf.Graph().as_default() as g:
     #Enque data for evaluation
     num_examples_per_epoch, tower_img_embedding, tower_context_length, \
-        tower_caption_length, tower_topic_length, tower_context_id, tower_caption_id, \
-        tower_answer_id, tower_topic_id, tower_context_mask, \
+        tower_caption_length, tower_context_id, tower_caption_id, \
+        tower_answer_id, tower_context_mask, \
         tower_caption_mask = enqueue(True)
 
     tower_argmax = []
@@ -160,15 +172,13 @@ def evaluate():
                 tower_img_embedding[i],
                 tower_context_length[i],
                 tower_caption_length[i],
-                tower_topic_length[i],
                 tower_context_id[i],
                 tower_caption_id[i],
                 tower_answer_id[i],
-                tower_topic_id[i],
                 tower_context_mask[i],
                 tower_caption_mask[i]
             ]
-            net = CSMN(inputs, ModelConfig(FLAGS, True), is_training= False)
+            net = CSMN(inputs, ModelConfig(FLAGS), is_training= False, topics)
             argmax = net.argmax
             # Reuse variables for the next tower.
             tf.get_variable_scope().reuse_variables()
@@ -205,4 +215,3 @@ def main(argv=None):
 
 if __name__ == '__main__':
   tf.app.run()
-

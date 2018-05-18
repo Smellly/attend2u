@@ -8,23 +8,23 @@ import colorlog
 import time
 from utils.data_utils import enqueue
 from utils.configuration import ModelConfig
-from model.model_tpcnocon import CSMN
+from model.model_nocnn import CSMN
 from scripts.generate_dataset import EOS_ID
 from utils.evaluator import Evaluator
 from termcolor import colored
 flags = tf.app.flags
 
-flags.DEFINE_string('eval_dir', './checkpoints-tpnocon/eval',
+flags.DEFINE_string('eval_dir', './checkpoints-nocnn/eval',
                            """Directory where to write event logs.""")
 flags.DEFINE_string('eval_data', 'test',
                            """Either 'test' or 'train_eval'.""")
-flags.DEFINE_string("train_dir", "./checkpoints-tpnocon", "checkpoint directory [checkpoints]")
+flags.DEFINE_string("train_dir", "./checkpoints-nocnn", "checkpoint directory [checkpoints]")
 flags.DEFINE_string(
     "vocab_fname",
     "./data/caption_dataset/40000.vocab",
     "Vocabulary file for evaluation"
 )
-flags.DEFINE_integer("num_gpus", 1, "Number of gpus to use")
+flags.DEFINE_integer("num_gpus", 4, "Number of gpus to use")
 flags.DEFINE_integer('eval_interval_secs', 60 * 1,
                             """How often to run the eval.""")
 flags.DEFINE_boolean('run_once', True,
@@ -146,8 +146,8 @@ def evaluate():
   with tf.Graph().as_default() as g:
     #Enque data for evaluation
     num_examples_per_epoch, tower_img_embedding, tower_context_length, \
-        tower_caption_length, tower_topic_length, tower_context_id, tower_caption_id, \
-        tower_answer_id, tower_topic_id, tower_context_mask, \
+        tower_caption_length, tower_context_id, tower_caption_id, \
+        tower_answer_id, tower_context_mask, \
         tower_caption_mask = enqueue(True)
 
     tower_argmax = []
@@ -160,11 +160,9 @@ def evaluate():
                 tower_img_embedding[i],
                 tower_context_length[i],
                 tower_caption_length[i],
-                tower_topic_length[i],
                 tower_context_id[i],
                 tower_caption_id[i],
                 tower_answer_id[i],
-                tower_topic_id[i],
                 tower_context_mask[i],
                 tower_caption_mask[i]
             ]

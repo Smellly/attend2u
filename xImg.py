@@ -39,8 +39,8 @@ def extract_feature(image_path):
     arg_scope = resnet_arg_scope()
     with slim.arg_scope(arg_scope):
         logits, end_points = resnet_v1_101(processed_image, 
-                                            num_classes=1000,\
-                                            is_training=False)   
+                                            num_classes=1000) #, \
+                                            # is_training=False)   
         pool5 = tf.get_default_graph().get_operation_by_name('resnet_v1_101/pool5').outputs[0]
         pool5 = tf.transpose(pool5, perm=[0, 3, 1, 2])  # (batch_size, 2048, 1, 1)
         

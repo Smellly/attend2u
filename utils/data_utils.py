@@ -26,6 +26,9 @@ flags.DEFINE_integer("max_context_length", 60,
 flags.DEFINE_integer("max_output_length", 16,
     "User contex max length default [60]"
 )
+flags.DEFINE_integer("max_topic_length", 5,
+    "User contex max length default [5]"
+)
 flags.DEFINE_integer('batch_size', 200,
     """Number of examples to process in a batch."""
 )
@@ -41,13 +44,13 @@ flags.DEFINE_integer('mem_dim', 1024,
 flags.DEFINE_integer('num_channels', 300,
     """Number of channels of memory cnn."""
 )
-flags.DEFINE_string('input_path', 'test1.txt',
+flags.DEFINE_string('input_path', 'tpcon_test1.txt',
         """path to the input text""")
 
 FLAGS = flags.FLAGS
 
 root_path = "/"
-train_fpath = 'train.txt'
+train_fpath = 'tpcon_train.txt'
 # val_fpath = 'test1.txt'
 val_fpath = FLAGS.input_path
 
@@ -128,16 +131,16 @@ def read_numpy_format_and_label(filename_queue):
   filename_and_label_tensor = filename_queue.dequeue_many(
       FLAGS.batch_size
   )
-  batch_filename, batch_context_length, batch_caption_length, \
-      batch_context, batch_caption = tf.decode_csv(
+  batch_filename, batch_context_length, batch_topic_length, batch_caption_length, \
+      batch_context, batch_topic, batch_caption = tf.decode_csv(
           filename_and_label_tensor,
-          [[""], [""], [""], [""], [""]]
+          [[""], [""], [""], [""], [""], [""], [""]]
       )
   batch_context_length = tf.minimum(
       tf.cast(
           tf.string_to_number(batch_context_length),
           tf.int32
-      ),
+      )+1,
       FLAGS.max_context_length
   )
   batch_caption_length = tf.minimum(
@@ -147,6 +150,13 @@ def read_numpy_format_and_label(filename_queue):
       )+1,
       FLAGS.max_output_length
   )
+  batch_topic_length = tf.minimum(
+      tf.cast(
+          tf.string_to_number(batch_topic_length),
+          tf.int32
+      )+1,
+      FLAGS.max_topic_length
+  )
   batch_img_embedding = tf.py_func(
       numpy_read_func,
       [batch_filename],
@@ -154,7 +164,7 @@ def read_numpy_format_and_label(filename_queue):
   )
   batch_context_id = tf.py_func(
       token_split_func,
-      [batch_context, FLAGS.max_context_length],
+      [batch_context, FLAGS.max_context_length, 'caption'],
       tf.int32
   )
   batch_caption_id = tf.py_func(
@@ -165,6 +175,11 @@ def read_numpy_format_and_label(filename_queue):
   batch_answer_id = tf.py_func(
       token_split_func,
       [batch_caption, FLAGS.max_output_length, 'answer'],
+      tf.int32
+  )
+  batch_topic_id = tf.py_func(
+      token_split_func,
+      [batch_topic, FLAGS.max_topic_length, 'topic'],
       tf.int32
   )
   batch_context_mask = tf.py_func(
@@ -179,8 +194,9 @@ def read_numpy_format_and_label(filename_queue):
   )
 
   return batch_img_embedding, batch_context_length, \
-      batch_caption_length, batch_context_id, batch_caption_id, \
-      batch_answer_id, batch_context_mask, batch_caption_mask
+      batch_caption_length, batch_topic_length,  batch_context_id, batch_caption_id, \
+      batch_answer_id, batch_topic_id, batch_context_mask, batch_caption_mask
+
 def chunks(data, batch_size):
   chunk_l = []
   N = int(len(data)/batch_size)
@@ -196,9 +212,8 @@ def mergers(chunk_l):
       newdata.append(data)
   return newdata
 def enqueue(eval_data):
-
   # string input format
-  # numpyfname,contextlength,captionlength,contexttoken1_contexttoken2,wordtoken1_wordtoken2
+  # numpyfname,contextlength,topiclength,captionlength,contexttoken1_contexttoken2,topictoken1_topictoken2,wordtoken1_wordtoken2
   # e.g. 12345.npy,4,3,445_24_445_232,134_466_234
   if not eval_data:
     filenames = [l.strip() for l in open(os.path.join(FLAGS.data_dir, train_fpath)).readlines()]
@@ -222,15 +237,17 @@ def enqueue(eval_data):
   img_embedding_list = []
   context_length_list = []
   caption_length_list = []
+  topic_length_list = []
   context_id_list = []
   caption_id_list = []
   answer_id_list = []
+  topic_id_list = []
   context_mask_list = []
   caption_mask_list = []
 
   for it in range(FLAGS.num_gpus):
-    img_embedding, context_length, caption_length, context_id, caption_id, \
-        answer_id, context_mask, caption_mask = read_numpy_format_and_label( filename_queue)
+    img_embedding, context_length,  caption_length, topic_length, context_id, caption_id, \
+        answer_id, topic_id, context_mask, caption_mask = read_numpy_format_and_label(filename_queue)
 
     # Set the shapes of tensors
     img_embedding.set_shape([FLAGS.batch_size, 2048,1,1])
@@ -240,9 +257,11 @@ def enqueue(eval_data):
     )
     context_length.set_shape([FLAGS.batch_size])
     caption_length.set_shape([FLAGS.batch_size])
+    topic_length.set_shape([FLAGS.batch_size])
     context_id.set_shape([FLAGS.batch_size, FLAGS.max_context_length])
     caption_id.set_shape([FLAGS.batch_size, FLAGS.max_output_length])
     answer_id.set_shape([FLAGS.batch_size, FLAGS.max_output_length])
+    topic_id.set_shape([FLAGS.batch_size, FLAGS.max_topic_length])
     context_mask.set_shape([FLAGS.batch_size, FLAGS.max_context_length])
     caption_mask.set_shape([FLAGS.batch_size, FLAGS.max_output_length])
 
@@ -253,20 +272,22 @@ def enqueue(eval_data):
     )
 
     # Generate a batch of images and labels by building up a queue of examples.
-    img_embeddings, context_lengths, caption_lengths, \
-        context_ids, caption_ids, answer_ids, context_masks, \
+    img_embeddings, context_lengths, topic_lengths, caption_lengths, \
+        context_ids, caption_ids, answer_ids, topic_ids, context_masks, \
         caption_masks = _generate_data_and_label_batch(
-            [img_embedding, context_length, caption_length, \
-            context_id, caption_id, answer_id, context_mask, caption_mask],
+            [img_embedding, context_length, topic_length, caption_length, \
+            context_id, caption_id, answer_id, topic_id, context_mask, caption_mask],
             min_queue_examples, FLAGS.batch_size,
             shuffle=(not eval_data)
         )
     img_embeddings = tf.squeeze(img_embeddings, axis = [0])
     context_lengths = tf.squeeze(context_lengths, axis = [0])
     caption_lengths = tf.squeeze(caption_lengths, axis = [0])
+    topic_lengths = tf.squeeze(topic_lengths, axis = [0])
     context_ids = tf.squeeze(context_ids, axis = [0])
     caption_ids = tf.squeeze(caption_ids, axis = [0])
     answer_ids = tf.squeeze(answer_ids, axis = [0])
+    topic_ids = tf.squeeze(topic_ids, axis = [0])
     context_masks = tf.squeeze(context_masks, axis = [0])
     caption_masks = tf.squeeze(caption_masks, axis = [0])
 
@@ -274,12 +295,14 @@ def enqueue(eval_data):
     img_embedding_list.append(img_embeddings)
     context_length_list.append(context_lengths)
     caption_length_list.append(caption_lengths)
+    topic_length_list.append(topic_lengths)
     context_id_list.append(context_ids)
     caption_id_list.append(caption_ids)
+    topic_id_list.append(topic_ids)
     answer_id_list.append(answer_ids)
     context_mask_list.append(context_masks)
     caption_mask_list.append(caption_masks)
 
   return num_examples_per_epoch, img_embedding_list, context_length_list, \
-      caption_length_list, context_id_list, caption_id_list, answer_id_list, \
-      context_mask_list, caption_mask_list
+      caption_length_list, topic_length_list, context_id_list, caption_id_list, answer_id_list, \
+      topic_id_list, context_mask_list, caption_mask_list

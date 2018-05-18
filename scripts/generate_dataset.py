@@ -19,6 +19,7 @@ HASHTAG_VOCAB_SIZE = 60000
 DATA_ROOT_PATH = '../data'
 
 # For dataset
+'''
 CAPTION_TRAIN_JSON_FNAME = os.path.join(
     DATA_ROOT_PATH, 'json', 'insta-caption-train.json'
 )
@@ -27,6 +28,16 @@ CAPTION_TEST1_JSON_FNAME = os.path.join(
 )
 CAPTION_TEST2_JSON_FNAME = os.path.join(
     DATA_ROOT_PATH, 'json', 'insta-caption-test2.json'
+)
+'''
+CAPTION_TRAIN_JSON_FNAME = os.path.join(
+    DATA_ROOT_PATH, 'json', 'topic-caption-train.json'
+)
+CAPTION_TEST1_JSON_FNAME = os.path.join(
+    DATA_ROOT_PATH, 'json', 'topic-caption-test1.json'
+)
+CAPTION_TEST2_JSON_FNAME = os.path.join(
+    DATA_ROOT_PATH, 'json', 'topic-caption-test2.json'
 )
 HASHTAG_TRAIN_JSON_FNAME = os.path.join(
     DATA_ROOT_PATH, 'json', 'insta-hashtag-train.json'
@@ -107,7 +118,7 @@ def tokenize(sentence):
   return sentence.split()
 
 
-def tokenize_all(train_json, test1_json, test2_json, key='caption'):
+def tokenize_all(train_json, test1_json, test2_json, key='caption', topic = False):
   """
   Tokenize sentences in raw dataset
 
@@ -127,7 +138,13 @@ def tokenize_all(train_json, test1_json, test2_json, key='caption'):
     train_tokens[user_id] = {}
     for post_id, post in posts.items():
       post_tokens = tokenize(post[key])
-      train_tokens[user_id][post_id] = post_tokens
+      if topic:
+        topic_tokens = tokenize(post['topic'])
+        train_tokens[user_id][post_id] = [post_tokens, topic_tokens]
+        for post_token in topic_tokens:
+          token_counter[post_token] += 1
+      else:
+        train_tokens[user_id][post_id] = post_tokens
       for post_token in post_tokens:
         token_counter[post_token] += 1
 
@@ -136,14 +153,23 @@ def tokenize_all(train_json, test1_json, test2_json, key='caption'):
     test1_tokens[user_id] = {}
     for post_id, post in posts.items():
       post_tokens = tokenize(post[key])
-      test1_tokens[user_id][post_id] = post_tokens
+      if topic:
+        topic_tokens = tokenize(post['topic'])
+        test1_tokens[user_id][post_id] = [post_tokens, topic_tokens]
+      else:
+        test1_tokens[user_id][post_id] = post_tokens
+
 
   # Test2 data
   for user_id, posts in tqdm(test2_json.items(), ncols=70, desc="test2 data"):
     test2_tokens[user_id] = {}
     for post_id, post in posts.items():
       post_tokens = tokenize(post[key])
-      test2_tokens[user_id][post_id] = post_tokens
+      if topic:
+        topic_tokens = tokenize(post['topic'])
+        test2_tokens[user_id][post_id] = [post_tokens, topic_tokens]
+      else:
+        test2_tokens[user_id][post_id] = post_tokens
 
   return token_counter, train_tokens, test1_tokens, test2_tokens
 
@@ -225,22 +251,29 @@ def save_data(train_data, test1_data, test2_data, output_path, rev_vocab):
   def _save_data(all_tokens, all_tfidf, fname):
     all_strings = []
     for user_id, posts in all_tokens.items():
+      '''
       context_tokenids = map(
           str, [rev_vocab.get(token, UNK_ID) for token in all_tfidf[user_id]]
       )
       context_length = str(len(context_tokenids))
       context_string = '_'.join(context_tokenids)
+      ''' 
       for post_id, tokens in posts.items():
         caption_tokenids = map(
-            str, [rev_vocab.get(token, UNK_ID) for token in tokens]
+            str, [rev_vocab.get(token, UNK_ID) for token in tokens[0]]
         )
         caption_length = str(len(caption_tokenids))
         caption_string = '_'.join(caption_tokenids)
+        topic_tokenids = map(
+            str, [rev_vocab.get(token, UNK_ID) for token in tokens[1]]
+        )
+        topic_length = str(len(topic_tokenids))
+        topic_string = '_'.join(topic_tokenids)
         numpy_string = '%s_@_%s.npy' % (user_id, post_id)
 
         all_string = ','.join([
-            numpy_string, context_length, caption_length,
-            context_string, caption_string
+            numpy_string, topic_length, caption_length,
+            topic_string, caption_string
         ])
         all_strings.append((all_string + '\n', len(caption_tokenids)))
 
@@ -252,13 +285,13 @@ def save_data(train_data, test1_data, test2_data, output_path, rev_vocab):
         f.write(all_string[0])
 
   _save_data(
-      train_data[0], train_data[1], os.path.join(output_path, "train.txt")
+      train_data[0], train_data[1], os.path.join(output_path, "tpc_train.txt")
   )
   _save_data(
-      test1_data[0], test1_data[1], os.path.join(output_path, "test1.txt")
+      test1_data[0], test1_data[1], os.path.join(output_path, "tpc_test1.txt")
   )
   _save_data(
-      test2_data[0], test2_data[1], os.path.join(output_path, "test2.txt")
+      test2_data[0], test2_data[1], os.path.join(output_path, "tpc_test2.txt")
   )
 
 
@@ -291,8 +324,10 @@ def main():
           caption_train_json,
           caption_test1_json,
           caption_test2_json,
-          'caption'
+          'caption',
+          'topic'
       )
+  
   hashtag_counter, hashtag_train_tokens, hashtag_test1_tokens, \
       hashtag_test2_tokens = tokenize_all(
           hashtag_train_json,
@@ -300,7 +335,6 @@ def main():
           hashtag_test2_json,
           'tags'
       )
-
   # Create vocabulary
   caption_vocab, caption_rev_vocab = create_vocabulary(
       caption_counter, CAPTION_VOCAB_FNAME, CAPTION_VOCAB_SIZE
@@ -310,6 +344,7 @@ def main():
   )
 
   # Get tfidf weighted tokens
+  '''
   caption_train_tfidf_tokens, caption_test1_tfidf_tokens, \
       caption_test2_tfidf_tokens = get_tfidf_words(
           caption_train_tokens,
@@ -318,6 +353,7 @@ def main():
           caption_vocab,
           caption_rev_vocab
       )
+  '''
   hashtag_train_tfidf_tokens, hashtag_test1_tfidf_tokens, \
       hashtag_test2_tfidf_tokens = get_tfidf_words(
           hashtag_train_tokens,
@@ -328,10 +364,15 @@ def main():
       )
 
   # Save data
+  '''
+  (caption_train_tokens, caption_train_tfidf_tokens),
+  (caption_test1_tokens, caption_test1_tfidf_tokens),
+  (caption_test2_tokens, caption_test2_tfidf_tokens),
+  '''
   save_data(
-      (caption_train_tokens, caption_train_tfidf_tokens),
-      (caption_test1_tokens, caption_test1_tfidf_tokens),
-      (caption_test2_tokens, caption_test2_tfidf_tokens),
+      (caption_train_tokens, None),
+      (caption_test1_tokens, None),
+      (caption_test2_tokens, None),
       CAPTION_OUTPUT_PATH,
       caption_rev_vocab
   )

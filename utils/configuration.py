@@ -29,30 +29,47 @@ class BaseConfig(object):
 
 
 class ModelConfig(BaseConfig):
-  def __init__(self, FLAGS):
+  def __init__(self, FLAGS, topic_flag=False):
     super(ModelConfig, self).__init__(FLAGS)
 
+    self.load("model.config")
     # Embedding dimensions
     self.img_dim = 2048
 
     # Memory size
     self.img_memory_size = 1
-    #self.max_context_length = 80
-    #self.max_output_length = 16
-    self.memory_size = (
-        self.img_memory_size + self.max_context_length + \
-        self.max_output_length
-    )
+    # self.max_context_length = 
+    # self.max_output_length = 16
+    if topic_flag:
+        # print('!!!!!!!!!!!!!!!!!!!!!!!topic!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        self.memory_size = (
+            self.img_memory_size + self.max_output_length
+        )
+    else:
+        # print('!!!!!!!!!!!!!!!!!!!!!!!not topic!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        self.memory_size = (
+            self.img_memory_size + self.max_context_length + \
+            self.max_output_length
+        )
+    # print(self.memory_size)
 
     # Memory CNN
     self.context_filter_sizes = [3, 4, 5]
     self.output_filter_sizes = [3, 4, 5]
-    self.num_channels_total = self.num_channels * \
-        (len(self.context_filter_sizes) + len(self.output_filter_sizes))
+    if topic_flag:
+        self.num_channels_total = self.num_channels * \
+            (len(self.output_filter_sizes))
+        # print('!!!!!!!!!!!!!!!!!!!!!!!topic!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+    else:
+        print('!!!!!!!!!!!!!!!!!!!!!!!not topic!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        self.num_channels_total = self.num_channels * \
+            (len(self.context_filter_sizes) + len(self.output_filter_sizes))
+    # print(self.num_channels)
+    # print(len(self.output_filter_sizes))
+    # print(self.num_channels_total)
 
     colorlog.info("Model configuration")
     pp(vars(self))
-    self.load("model.config")
     self.batch_size = FLAGS.batch_size
     self.save("model.config")
 

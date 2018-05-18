@@ -6,7 +6,6 @@ from __future__ import print_function
 
 import inspect
 import tensorflow as tf
-import os
 
 from scripts.generate_dataset import GO_ID
 
@@ -32,7 +31,6 @@ class CSMN(object):
           [-1, size, self.mem_dim]
       )
     return output2dim
-
   def _init_img_mem(self, conv_cnn):
     """
     Returns:
@@ -52,7 +50,6 @@ class CSMN(object):
         reuse = False
     )
     return img_mem_A, img_mem_C
-  
   def _text_cnn(self, inputs, filter_sizes, mem_size, scope):
     """Text CNN. Code from https://github.com/dennybritz/cnn-text-classification-tf
 
@@ -89,6 +86,7 @@ class CSMN(object):
         )
         pooled_outputs.append(pooled)
     return pooled_outputs
+
 
   def _init_words_mem(self, words, shape, words_mask, max_length, is_first_time, is_init_B):
     """
@@ -140,27 +138,6 @@ class CSMN(object):
     return words_mem_A, words_mem_C
 
   def __init__(self, inputs, config, name="CSMN", is_training=True):
-    def _init_tpc_mem():
-      with open(os.path.join('data', 'Topic_list.txt'), 'r') as f:
-          topic_list = f.readlines()
-      topic_word = [x.split()[0] for x in topic_list]
-      with open(os.path.join('data', 'caption_dataset', '40000.vocab'), 'r') as f:
-          vocab = f.read().split('\n')
-      topic_ind = []
-      for x in topic_word:
-          if x in vocab:
-              topic_ind.append(vocab.index(x))
-          else:
-              print('not int topic word:', x)
-
-      u_matrix =  tf.get_variable(
-              'u_matrix', 
-              shape=[self.mem_dim, self.mem_dim],
-              initializer=self.w_initializer,
-              trainable=True
-            )
-      return tf.reshape(tf.convert_to_tensor(topic_ind, dtype=tf.int32), [-1, 1]), u_matrix
-
     (conv_cnn, context_largest_length, output_largest_length,
         context, caption, answer, context_mask, output_mask) = inputs
     context_largest_length = tf.reduce_max(context_largest_length)
@@ -177,7 +154,6 @@ class CSMN(object):
     self.is_training = is_training
     self.name = name
     self.w_initializer = tf.uniform_unit_scaling_initializer(1.0)
-    # self.w_initializer = tf.initializers.variance_scaling(1.0)
     self.b_initializer = tf.constant_initializer(0.0)
 
     emb_shape = [self.vocab_size, self.word_emb_dim]
@@ -211,21 +187,16 @@ class CSMN(object):
     )
 
     # Build Memories
-    # Image Memory
     img_mem_A, img_mem_C = self._init_img_mem(conv_cnn)
-    # User Context Memory
-    # if topics is True, context_mem is topics_mem
-    # context_mem_A, _ = self._init_words_mem(
-    #     context,
-    #     tf.stack([self.batch_size, context_largest_length]),
-    #     context_mask,
-    #     self.max_context_length,
-    #     is_first_time = True,
-    #     is_init_B = False
-    # )
-    topic_ind, u_matrix = _init_tpc_mem()
+    context_mem_A, context_mem_C = self._init_words_mem(
+        context,
+        tf.stack([self.batch_size, context_largest_length]),
+        context_mask,
+        self.max_context_length,
+        is_first_time = True,
+        is_init_B = False
+    )
 
-    # Word Output Memory
     if self.is_training:
       output_mem_A, output_mem_B, output_mem_C = self._init_words_mem(
           caption,
@@ -271,7 +242,6 @@ class CSMN(object):
 
       def _test_input():
         def _go_symbol():
-            # GO_ID = 1
           return tf.constant(GO_ID, shape=[self.batch_size, 1], dtype=tf.int32)
 
         def _not_go_symbol():
@@ -283,7 +253,6 @@ class CSMN(object):
               [self.batch_size, 1]
           )
           return out
-      
         prev_word = tf.cond(tf.equal(iterator_, 0), _go_symbol, _not_go_symbol)
 
         output_A_slice = self._embedding_to_hidden(
@@ -348,87 +317,20 @@ class CSMN(object):
       )
 
       # Memory network computation (mem_A -> attention -> mem_Catt)
-      # mem_A = tf.concat([img_mem_A, context_mem_A, output_mem_state_A_], 1)
-      # innerp_mem_A = tf.matmul(query, mem_A, adjoint_b=True)
-      mem_A = tf.concat([img_mem_A, output_mem_state_A_], 1)
+      mem_A = tf.concat([img_mem_A, context_mem_A, output_mem_state_A_], 1)
+      innerp_mem_A = tf.matmul(query, mem_A, adjoint_b=True)
 
       memory_sizes = [
           self.img_memory_size,
-          # self.max_context_length,
+          self.max_context_length,
           self.max_output_length
       ]
-
-      print('shape of output_mem_state_A:', output_mem_state_A.get_shape())
-      print('shape of output_mem_B_:', output_mem_B_.get_shape())
-
-      topic_emb = tf.nn.embedding_lookup(
-          self.Web, 
-          tf.slice(topic_ind, [0, 0], topic_ind.shape))
-
-      topic_mem = tf.get_variable(
-              'topic_mem',
-              shape=[topic_ind.get_shape()[0], self.mem_dim],
-              trainable = False
-              )
-      topic_mem = self._embedding_to_hidden(
-                  topic_emb, 
-                  int(topic_ind.shape[0]),
-                  reuse = True
-                ) 
-      topic_mem = tf.reshape(topic_mem, [self.mem_dim, -1])
-
-      print('shape of topic:', topic_ind.shape)
-      print('shape of img_mem_A:', img_mem_A.shape)
-      print('shape of output_mem_state_A:', output_mem_state_A_.shape)
-      print('shape of u_matrix:', u_matrix.shape)
-      print('shape of query:', query.shape)
-      print('shape of mem_A:', mem_A.shape)
-      print('shape of topic_mem:', topic_mem.shape)
-      print('shape of tf.matmul(u_matrix, mem_A):', tf.einsum('abi,ij->abj', mem_A, u_matrix).shape)
-
-      alpha_m = tf.einsum('abi,ij->abj', tf.einsum('abi,ij->aji', mem_A, u_matrix), topic_mem)
-      alpha_m_re = tf.reduce_sum(alpha_m, axis=1)
-      print('shape of alpha_m_re:', alpha_m_re.shape)
-
-      alpha_numerator = [ [] for i in range(self.batch_size) ]
-      for i in range(self.batch_size):
-          for j in range(self.max_context_length):
-              alpha_numerator[i].append(
-                      tf.nn.embedding_lookup(alpha_m_re[i,:], context[i, j]))
-      alpha_numerator = tf.stack(alpha_numerator)
-      print('shape of alpha_numerator:', alpha_numerator.shape)
-      alpha_numerator = tf.reduce_sum(
-                            tf.exp(
-                            tf.reduce_sum(
-                                tf.reshape(
-                                    alpha_numerator, 
-                                    [self.batch_size, -1, self.max_context_length]),
-                                axis=1)),
-                            axis=1)
-      alpha_numerator = tf.reshape(alpha_numerator, [self.batch_size, -1])
-      print('shape of alpha_numerator:', alpha_numerator.shape)
-      # stb = tf.constant(1e-8, tf.float32) * tf.ones([self.batch_size, 1])
-      alpha_denomenator = tf.reshape(tf.reduce_sum(tf.exp(alpha_m_re), axis = 1), [self.batch_size, -1])
-      print('shape of alpha_denomenator after reshape:', alpha_denomenator.shape)
-      alpha = tf.divide(alpha_numerator, alpha_denomenator)
-
-      print('shape of innerp_mem_A without alpha:', tf.matmul(query, mem_A, adjoint_b=True).shape)
-      print('shape of alpha:', alpha.shape)
-      # innerp_mem_A = tf.reshape(tf.matmul(query, mem_A, adjoint_b=True), [self.batch_size, -1])
-      innerp_mem_A = tf.multiply(alpha, tf.reshape(tf.matmul(query, mem_A, adjoint_b=True), [self.batch_size, -1]))
-
-      print('shape of innerp_mem_A:', innerp_mem_A.shape)
-      print('shape of img_memory_size:', self.img_memory_size)
-      print('shape of self.max_context_length:', self.max_context_length)
-      print('shape of self.max_output_length:', self.max_output_length)
-      print('shape of memory_size:', self.memory_size)
-
       attention = tf.nn.softmax(
           tf.reshape(innerp_mem_A, [-1, self.memory_size]),
           name='attention'
       )
 
-      img_attention, output_attention = \
+      img_attention, context_attention, output_attention = \
           tf.split(attention, memory_sizes, axis=1)
 
       img_attention = tf.tile(
@@ -438,7 +340,6 @@ class CSMN(object):
           ),
           [1, 1, self.mem_dim]
       )
-      '''
       context_attention = tf.tile(
           tf.reshape(
               context_attention,
@@ -446,7 +347,6 @@ class CSMN(object):
           ),
           [1, 1, self.mem_dim]
       )
-      '''
       output_attention = tf.tile(
           tf.reshape(
               output_attention,
@@ -459,12 +359,10 @@ class CSMN(object):
           img_mem_C * img_attention,
           [self.batch_size, self.mem_dim]
       )
-      '''
       context_weighted_mem_C = tf.expand_dims(
           context_mem_C * context_attention,
           -1
       )
-      '''
       output_weighted_mem_C = tf.expand_dims(
           output_mem_state_C_ * output_attention,
           -1
@@ -472,14 +370,12 @@ class CSMN(object):
 
       # Memory CNN
       pooled_outputs = []
-      '''
       pooled_outputs += self._text_cnn(
           context_weighted_mem_C,
           self.context_filter_sizes,
           self.max_context_length,
           scope = "context"
       )
-      '''
       pooled_outputs += self._text_cnn(
           output_weighted_mem_C,
           self.output_filter_sizes,
@@ -487,15 +383,8 @@ class CSMN(object):
           scope = "output"
       )
 
-      print('shape of img_attention:', img_attention.get_shape())
-      print('shape of output_attention:', output_attention.get_shape())
-      print('shape of attention:', attention.get_shape())
-      print('shape of output_mem_C:', output_mem_C.get_shape())
-      print('shape of output_weighted_mem_C:', output_weighted_mem_C.get_shape())
       h_pool = tf.concat(pooled_outputs, 3)
       h_pool_flat = tf.reshape(h_pool, [-1, self.num_channels_total])
-      print('shape of h_pool:', h_pool)
-      print('shape of h_pool_flat:', h_pool_flat)
       with arg_scope([layers.fully_connected],
               num_outputs = self.num_channels_total,
               activation_fn = tf.nn.relu,
@@ -508,11 +397,7 @@ class CSMN(object):
                 scope="Wpool5"
         )
 
-        print('shape of img_mem_C:', img_mem_C.get_shape())
-        print('shape of img_weighted_mem_C:', img_weighted_mem_C.get_shape())
-        print('shape of img_feature:', img_feature.get_shape())
-        img_added_result = img_feature +  h_pool_flat
-        print('shape of img_added_result:', img_added_result.get_shape())
+        img_added_result = img_feature + h_pool_flat
         output = layers.fully_connected(
                 img_added_result,
                 reuse = False,
@@ -578,17 +463,9 @@ class CSMN(object):
         [self.batch_size, output_largest_length]
     )
     answer = tf.slice(answer, [0, 0], [self.batch_size, output_largest_length])
-
-    # print('sequence_outputs:', sequence_outputs.get_shape())
-    # print('self.prob:', self.prob)
-    # print('loop_outputs:', loop_outputs)
-    # print('output_mask:', output_mask)
-    # print('answer:', answer)
     self.loss = sequence_loss(
         [final_outputs],
         [tf.reshape(answer, [-1])],
         [tf.reshape(tf.to_float(output_mask), [-1])]
     )
     output_words_array.close()
-
-

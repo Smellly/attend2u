@@ -3,6 +3,7 @@ import logging
 import colorlog
 import tensorflow as tf
 
+# from model.model import CSMN
 from model.model_tpcnocon import CSMN
 from utils.data_utils import enqueue
 from utils.configuration import ModelConfig
@@ -13,12 +14,13 @@ import os
 flags = tf.app.flags
 
 flags.DEFINE_integer("num_gpus", 4, "Number of gpus to use")
-flags.DEFINE_string('train_dir', './checkpoints-tpnocon',
+# flags.DEFINE_string('train_dir', './checkpoints',
+flags.DEFINE_string('train_dir', './checkpoints-tpcnocon',
                            """Directory where to write event logs """
                            """and checkpoint.""")
-flags.DEFINE_float("init_lr", 0.000001, "initial learning rate [0.01]")
+flags.DEFINE_float("init_lr", 0.0001, "initial learning rate [0.01]")
 flags.DEFINE_float("max_grad_norm", 100, "clip gradients to this norm [100]")
-flags.DEFINE_integer("max_steps", 2000000, "number of steps to use during training [500000]")
+flags.DEFINE_integer("max_steps", 500000, "number of steps to use during training [500000]")
 
 FLAGS = flags.FLAGS
 # Constants describing the training process.
@@ -28,7 +30,7 @@ LEARNING_RATE_DECAY_FACTOR = 0.8  # Learning rate decay factor.
 TOWER_NAME = 'tower'
 
 def _tower_loss(inputs, scope):
-  net = CSMN(inputs, ModelConfig(FLAGS, True))
+  net = CSMN(inputs, ModelConfig(FLAGS, False))
   loss = net.loss
   tf.summary.scalar(scope+'loss', loss)
   return loss
@@ -94,8 +96,8 @@ def train():
           'global_step', [],
           initializer=tf.constant_initializer(0), trainable=False)
       num_examples_per_epoch, tower_img_embedding, tower_context_length, \
-          tower_caption_length, tower_topic_length, tower_context_id, tower_caption_id, \
-          tower_answer_id, tower_topic_id, tower_context_mask, \
+          tower_caption_length, tower_context_id, tower_caption_id, \
+          tower_answer_id, tower_context_mask, \
           tower_caption_mask = enqueue(False)
 
       # Calculate the learning rate schedule.
@@ -126,11 +128,9 @@ def train():
                   tower_img_embedding[i],
                   tower_context_length[i],
                   tower_caption_length[i],
-                  tower_topic_length[i],
                   tower_context_id[i],
                   tower_caption_id[i],
                   tower_answer_id[i],
-                  tower_topic_id[i],
                   tower_context_mask[i],
                   tower_caption_mask[i],
               ]
